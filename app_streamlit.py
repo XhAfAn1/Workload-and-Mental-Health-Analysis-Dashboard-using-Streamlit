@@ -89,8 +89,16 @@ def load_data():
 
 df = load_data()
 
+
+
 # Sidebar with comprehensive filters
 st.sidebar.title("Dashboard Controls")
+if st.sidebar.button("Reset All Filters", use_container_width=True, type="primary"):
+    # Clear all session state values for filters
+    for key in st.session_state.keys():
+        if key.endswith('_filter'):
+            del st.session_state[key]
+    st.rerun()
 st.sidebar.markdown("---")
 
 # Comprehensive filtering system
@@ -224,9 +232,7 @@ st.sidebar.write(f"**Gender:** {', '.join(gender_filter)}")
 st.sidebar.write(f"**CGPA Range:** {cgpa_filter[0]:.1f} - {cgpa_filter[1]:.1f}")
 st.sidebar.write(f"**Stress Level:** {stress_filter[0]} - {stress_filter[1]}")
 
-# Clear filters button
-if st.sidebar.button("Clear All Filters"):
-    st.rerun()
+
 # Main content
 st.markdown('<h1 class="main-header">Workload and Mental Health Analysis</h1>', unsafe_allow_html=True)
 
@@ -1056,10 +1062,10 @@ with tab3:
                 col1, col2 = st.columns(2)
                 with col1:
                     st.metric("No Job", f"{prop_no_job:.3f}", 
-                             f"{contingency_table.loc[0, 1]}/{contingency_table.loc[0].sum()}")
+                            f"{contingency_table.loc[0, 1]}/{contingency_table.loc[0].sum()}")
                 with col2:
                     st.metric("Has Job", f"{prop_has_job:.3f}", 
-                             f"{contingency_table.loc[1, 1]}/{contingency_table.loc[1].sum()}")
+                            f"{contingency_table.loc[1, 1]}/{contingency_table.loc[1].sum()}")
                 
                 # Perform test
                 chi2, p_value, dof, expected = stats.chi2_contingency(contingency_table)
@@ -1088,84 +1094,13 @@ with tab3:
                             labels={'value': 'Count', 'job': 'Job Status', 'high_stress': 'High Stress'})
                 fig.update_xaxes(title_text='Job Status', tickvals=[0, 1], ticktext=['No Job', 'Has Job'])
                 fig.update_layout(legend_title_text='High Stress', 
-                                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                 st.plotly_chart(fig, use_container_width=True)
                 
             except Exception as e:
                 st.error(f"Error performing test: {str(e)}")
-        
-        
-            st.markdown("<h3>Multiple Regression Predicting Stress</h3>", unsafe_allow_html=True)
-            
-            try:
-                # Display hypothesis info
-                st.markdown("""
-                **Hypotheses:**
-                - H₀: β = 0 (Predictor has no effect on stress controlling for other variables)
-                - H₁: β ≠ 0 (Predictor has effect on stress controlling for other variables)
-                
-                **Test:** Multiple regression with t-tests for coefficients
-                **Significance level:** α = 0.05
-                """)
-                
-                # Prepare regression data
-                X_vars = ['study_hours_per_week', 'sleep_hours', 'sleep_quality_1to10',
-                         'extracurricular', 'job', 'year_of_study']
-                X = filtered_df[X_vars]
-                y = filtered_df['stress_1to5']
-                
-                X = sm.add_constant(X)
-                model = sm.OLS(y, X).fit()
-                
-                # Display model summary
-                st.markdown(f"""
-                **Overall Model Results:**
-                - R² = {model.rsquared:.3f}
-                - F = {model.fvalue:.3f}
-                - p = {model.f_pvalue:.4f}
-                """)
-                
-                # Display coefficients
-                coef_data = []
-                for i, var in enumerate(X_vars):
-                    coef = model.params[i+1]  # +1 for constant
-                    p_val = model.pvalues[i+1]
-                    sig = "Yes" if p_val < alpha else "No"
-                    coef_data.append([var, coef, p_val, sig])
-                
-                coef_df = pd.DataFrame(coef_data, columns=['Predictor', 'Coefficient', 'p-value', 'Significant'])
-                st.write("**Coefficient Estimates:**")
-                st.dataframe(coef_df, use_container_width=True)
-                
-                # Conclusion
-                if model.f_pvalue < alpha:
-                    st.success("**CONCLUSION:** Reject H₀ - Overall model is significant")
-                    sig_predictors = [var for var, sig in zip(X_vars, coef_df['Significant']) if sig == "Yes"]
-                    if sig_predictors:
-                        st.info(f"Significant predictors: {', '.join(sig_predictors)}")
-                    else:
-                        st.info("No individual predictors are significant")
-                else:
-                    st.error("**CONCLUSION:** Fail to reject H₀ - Overall model is not significant")
-                
-                # Visualization - Coefficient plot
-                coef_plot_df = pd.DataFrame({
-                    'Predictor': X_vars,
-                    'Coefficient': model.params[1:],
-                    'CI_lower': model.conf_int().iloc[1:, 0],
-                    'CI_upper': model.conf_int().iloc[1:, 1]
-                })
-                
-                fig = px.scatter(coef_plot_df, x='Coefficient', y='Predictor', 
-                                error_x='Coefficient-CI_lower', error_x_minus='CI_upper-Coefficient',
-                                title='Regression Coefficients with 95% Confidence Intervals',
-                                labels={'Coefficient': 'Coefficient Value', 'Predictor': 'Predictor'})
-                fig.add_vline(x=0, line_dash="dash", line_color="red")
-                st.plotly_chart(fig, use_container_width=True)
-                
-            except Exception as e:
-                st.error(f"Error performing regression: {str(e)}")
-        with ht_tab7:
+
+
             st.markdown("<h3>Multiple Regression Predicting Stress</h3>", unsafe_allow_html=True)
             
             try:
@@ -1232,7 +1167,7 @@ with tab3:
                 coef_plot_df['error_lower'] = coef_plot_df['Coefficient'] - coef_plot_df['CI_lower']
                 coef_plot_df['error_upper'] = coef_plot_df['CI_upper'] - coef_plot_df['Coefficient']
                 
-                # Create the coefficient plot
+                # Create the coefficient plot using Graph Objects for better control
                 fig = go.Figure()
                 
                 # Add points for coefficients
@@ -1265,9 +1200,145 @@ with tab3:
                 
             except Exception as e:
                 st.error(f"Error performing regression: {str(e)}")
-
-with tab4:
-    with tab4:
+         
+        with ht_tab7:
+            st.markdown("<h3>Multiple Regression: Sleep Quality ~ Multiple Predictors</h3>", unsafe_allow_html=True)
+            
+            try:
+                # Display hypothesis info
+                st.markdown("""
+                **Hypotheses:**
+                - H₀: β = 0 (Predictor has no effect on sleep quality controlling for other variables)
+                - H₁: β ≠ 0 (Predictor has effect on sleep quality controlling for other variables)
+                
+                **Test:** Multiple regression with t-tests for coefficients
+                **Significance level:** α = 0.05
+                """)
+                
+                # Prepare regression data
+                X = filtered_df[['sleep_hours', 'stress_1to5', 'anxiety_1to5']]
+                y = filtered_df['sleep_quality_1to10']
+                
+                X = sm.add_constant(X)
+                model = sm.OLS(y, X).fit()
+                
+                # Display model summary
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("R²", f"{model.rsquared:.3f}")
+                with col2:
+                    st.metric("Adjusted R²", f"{model.rsquared_adj:.3f}")
+                with col3:
+                    st.metric("Overall p-value", f"{model.f_pvalue:.4f}")
+                
+                # Display coefficients
+                st.write("**Coefficient Estimates:**")
+                coef_data = []
+                predictors = ['Intercept'] + X.columns.tolist()[1:]  # Skip the 'const' column
+                for i, pred in enumerate(predictors):
+                    coef_data.append([
+                        pred,
+                        model.params[i],
+                        model.bse[i],
+                        model.tvalues[i],
+                        model.pvalues[i]
+                    ])
+                
+                coef_df = pd.DataFrame(coef_data, 
+                                    columns=['Predictor', 'Coefficient', 'Std. Error', 't-value', 'p-value'])
+                st.dataframe(coef_df, use_container_width=True)
+                
+                # Check multicollinearity
+                st.write("**Multicollinearity Check (VIF):**")
+                vif_data = pd.DataFrame()
+                vif_data["Variable"] = X.columns[1:]  # Skip the 'const' column
+                vif_data["VIF"] = [variance_inflation_factor(X.values, i) for i in range(1, X.shape[1])]  # Skip constant
+                st.dataframe(vif_data, use_container_width=True)
+                
+                # Interpretation
+                st.markdown("""
+                **Interpretation:**
+                - **Overall Model**: Statistically significant (p < 0.001) and explains 21.6% of variance
+                - **Sleep Hours**: Highly significant (p < 0.001) with strong positive relationship to sleep quality
+                - **Stress and Anxiety**: Not statistically significant in this multivariate model
+                - **Multicollinearity**: Very high VIF values (>19) for stress and anxiety, indicating severe multicollinearity
+                - **Practical Implications**: Sleep hours is the primary predictor of sleep quality
+                - **Model Quality**: Good overall fit but multicollinearity issues limit interpretation of individual coefficients
+                """)
+                
+                # Assumption checking
+                st.markdown("**Assumption Checking:**")
+                residuals = model.resid
+                
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    # Normality
+                    shapiro_stat, shapiro_p = stats.shapiro(residuals)
+                    st.metric("Shapiro-Wilk", f"p = {shapiro_p:.4f}", 
+                            "Violated" if shapiro_p < 0.05 else "OK")
+                
+                with col2:
+                    # Independence
+                    dw = sm.stats.stattools.durbin_watson(residuals)
+                    st.metric("Durbin-Watson", f"{dw:.3f}", 
+                            "OK (1.5-2.5)" if 1.5 <= dw <= 2.5 else "Potential issue")
+                
+                with col3:
+                    # Homoscedasticity
+                    try:
+                        bp_test = het_breuschpagan(residuals, model.model.exog)
+                        st.metric("Breusch-Pagan", f"p = {bp_test[1]:.4f}",
+                                "Violated" if bp_test[1] < 0.05 else "OK")
+                    except:
+                        pass
+                
+                # Coefficient plot
+                coef_plot_df = pd.DataFrame({
+                    'Predictor': X.columns[1:],  # Skip the 'const' column
+                    'Coefficient': model.params[1:],
+                    'CI_lower': model.conf_int().iloc[1:, 0],
+                    'CI_upper': model.conf_int().iloc[1:, 1]
+                })
+                
+                # Calculate error values
+                coef_plot_df['error_lower'] = coef_plot_df['Coefficient'] - coef_plot_df['CI_lower']
+                coef_plot_df['error_upper'] = coef_plot_df['CI_upper'] - coef_plot_df['Coefficient']
+                
+                # Create the coefficient plot using Graph Objects
+                fig = go.Figure()
+                
+                # Add points for coefficients
+                fig.add_trace(go.Scatter(
+                    x=coef_plot_df['Coefficient'],
+                    y=coef_plot_df['Predictor'],
+                    mode='markers',
+                    marker=dict(size=10, color='blue'),
+                    error_x=dict(
+                        type='data',
+                        symmetric=False,
+                        array=coef_plot_df['error_upper'],
+                        arrayminus=coef_plot_df['error_lower']
+                    ),
+                    name='Coefficients'
+                ))
+                
+                # Add vertical line at zero
+                fig.add_vline(x=0, line_dash="dash", line_color="red")
+                
+                # Update layout
+                fig.update_layout(
+                    title='Regression Coefficients with 95% Confidence Intervals',
+                    xaxis_title='Coefficient Value',
+                    yaxis_title='Predictor',
+                    showlegend=False
+                )
+                
+                # Add a unique key to the plotly_chart
+                st.plotly_chart(fig, use_container_width=True, key="sleep_quality_coef_plot")
+                
+            except Exception as e:
+                st.error(f"Error performing regression: {str(e)}")
+with tab4:  
         st.markdown("<h2 class='section-header'>Predictive Modeling</h2>", unsafe_allow_html=True)
         
         # Check if filtered data is not empty
